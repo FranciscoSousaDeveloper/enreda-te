@@ -1,0 +1,20 @@
+backend:
+  name: git-gateway
+  branch: main
+
+media_folder: "images/uploads"
+public_folder: "/images/uploads"
+
+collections:
+  - name: "noticias"
+    label: "Notícias"
+    folder: "content/noticias"
+    create: true
+    slug: "{{year}}-{{month}}-{{day}}-{{slug}}"
+    fields:
+      - { label: "Título", name: "title", widget: "string" }
+      - { label: "Data", name: "date", widget: "datetime" }
+      - { label: "Fotografia", name: "photo", widget: "image", required: false }
+      - { label: "Destaque na Homepage (Máx. 3)", name: "destaque", widget: "boolean", default: false }
+      - { label: "Resumo Simples", name: "summary", widget: "text" }
+      - { label: "Conteúdo da Notícia", name: "body", widget: "markdown" }
