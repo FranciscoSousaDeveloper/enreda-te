@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Enreda-te — Associação de Solidariedade</title>
 
-  <!-- Autenticação do Netlify (Decap CMS) -->
+  <!-- Autenticação Netlify Identity -->
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 
   <style>
@@ -54,6 +54,7 @@
     .news-body p { color: var(--m); font-size: 14px; margin: 0; }
     .center { text-align: center; margin-top: 28px; }
     .outline { display: inline-block; border-radius: 999px; padding: 12px 24px; font-weight: bold; text-decoration: none; border: 2px solid var(--g); color: var(--g); }
+    .loading-msg { grid-column: 1 / -1; text-align: center; color: var(--m); padding: 20px; font-style: italic; }
 
     /* --- CONTACTOS --- */
     .contactos-sec { padding: 60px 20px; background: #ffffff; }
@@ -106,7 +107,7 @@
     </div>
   </section>
 
-  <!-- 3. ÚLTIMAS NOTÍCIAS -->
+  <!-- 3. ÚLTIMAS NOTÍCIAS (DINÂMICAS) -->
   <section class="noticias-sec">
     <div class="wrap">
       <div class="section-title">
@@ -114,33 +115,9 @@
         <p>Fique a par das novidades mais recentes da associação.</p>
       </div>
       
-      <!-- Contentor onde as notícias do Decap CMS vão aparecer -->
+      <!-- Contentor onde as notícias dinâmicas vão ser injetadas -->
       <div class="news-grid" id="news-container">
-        <!-- Notícias de Exemplo estáticas (Substituídas se houver novidades) -->
-        <div class="news-card">
-          <div class="photo">FOTOGRAFIA</div>
-          <div class="news-body">
-            <div class="date">05 OUT 2026</div>
-            <h3>Nova atividade da Enreda-te</h3>
-            <p>Conheça a próxima iniciativa da associação.</p>
-          </div>
-        </div>
-        <div class="news-card">
-          <div class="photo">FOTOGRAFIA</div>
-          <div class="news-body">
-            <div class="date">28 SET 2026</div>
-            <h3>Projeto comunitário</h3>
-            <p>Uma nova iniciativa para aproximar pessoas.</p>
-          </div>
-        </div>
-        <div class="news-card">
-          <div class="photo">FOTOGRAFIA</div>
-          <div class="news-body">
-            <div class="date">15 SET 2026</div>
-            <h3>Encontro da associação</h3>
-            <p>Veja as novidades do nosso último encontro.</p>
-          </div>
-        </div>
+        <div class="loading-msg">A carregar últimas notícias...</div>
       </div>
 
       <div class="center">
@@ -166,8 +143,104 @@
     </div>
   </section>
 
-  <!-- Script para redirecionar utilizadores ao aceitarem convites do Netlify Identity -->
+  <!-- SCRIPT PARA CARREGAR AS NOTÍCIAS DO GITHUB/DECAP CMS -->
   <script>
+    const REPO_USER = 'FranciscoSousaDeveloper';
+    const REPO_NAME = 'enreda-te';
+    const FOLDER_PATH = 'content/noticias';
+
+    // Função simples para extrair o Frontmatter YAML dos ficheiros Markdown
+    function parseFrontmatter(markdown) {
+      const result = {};
+      const match = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+      if (match) {
+        const lines = match[1].split('\n');
+        lines.forEach(line => {
+          const colonIdx = line.indexOf(':');
+          if (colonIdx !== -1) {
+            const key = line.slice(0, colonIdx).trim();
+            let val = line.slice(colonIdx + 1).trim();
+            if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+            if (val === 'true') val = true;
+            if (val === 'false') val = false;
+            result[key] = val;
+          }
+        });
+      }
+      return result;
+    }
+
+    // Formatar data para PT (ex: 05 OUT 2026)
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      if (isNaN(date)) return dateStr;
+      const day = String(date.getDate()).padStart(2, '0');
+      const months = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+      const month = months[date.getMonth()];
+      const year = date.getFullYear();
+      return `${day} ${month} ${year}`;
+    }
+
+    async function fetchNews() {
+      const container = document.getElementById('news-container');
+      try {
+        const response = await fetch(`https://api.github.com/repos/${REPO_USER}/${REPO_NAME}/contents/${FOLDER_PATH}`);
+        if (!response.ok) throw new Error('Não foi possível aceder às notícias.');
+        
+        const files = await response.json();
+        const mdFiles = files.filter(f => f.name.endsWith('.md'));
+
+        if (mdFiles.length === 0) {
+          container.innerHTML = '<div class="loading-msg">Nenhuma notícia publicada ainda.</div>';
+          return;
+        }
+
+        const newsList = [];
+
+        for (const file of mdFiles) {
+          const res = await fetch(file.download_url);
+          const text = await res.text();
+          const meta = parseFrontmatter(text);
+          meta.filename = file.name;
+          newsList.push(meta);
+        }
+
+        // Filtrar destaques se definidos ou ordenar por data descendente
+        newsList.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+        // Priorizar as marcadas como "destaque: true", até 3 notícias
+        let featured = newsList.filter(n => n.destaque === true).slice(0, 3);
+        if (featured.length < 3) {
+          const remaining = newsList.filter(n => !featured.includes(n));
+          featured = featured.concat(remaining.slice(0, 3 - featured.length));
+        }
+
+        container.innerHTML = '';
+        featured.forEach(item => {
+          const photoBg = item.photo ? `style="background-image: url('${item.photo}'); color: transparent;"` : '';
+          const card = document.createElement('div');
+          card.className = 'news-card';
+          card.innerHTML = `
+            <div class="photo" ${photoBg}>${item.photo ? '' : 'FOTOGRAFIA'}</div>
+            <div class="news-body">
+              <div class="date">${formatDate(item.date)}</div>
+              <h3>${item.title || 'Sem Título'}</h3>
+              <p>${item.summary || ''}</p>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+
+      } catch (err) {
+        console.error(err);
+        container.innerHTML = '<div class="loading-msg">Erro ao carregar as notícias.</div>';
+      }
+    }
+
+    fetchNews();
+
+    // Netlify Identity Redirect
     if (window.netlifyIdentity) {
       window.netlifyIdentity.on("init", user => {
         if (!user) {
