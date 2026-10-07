@@ -139,14 +139,11 @@
           const photoBg = item.photo ? `style="background-image: url('${item.photo}'); color: transparent;"` : '';
           const card = document.createElement('div');
           card.className = 'news-card';
-        
-          card.style.cursor = 'pointer';
-          card.onclick = () => window.location.href = `/noticia.html?file=${item.filename}`;
           card.innerHTML = `
             <div class="photo" ${photoBg}>${item.photo ? '' : 'FOTOGRAFIA'}</div>
             <div class="news-body">
               <div class="date">${formatDate(item.date)}</div>
-              <h3><a href="/noticia.html?file=${item.filename}" style="text-decoration:none; color:inherit;">${item.title || 'Sem Título'}</a></h3>
+              <h3>${item.title || 'Sem Título'}</h3>
               <p>${item.summary || ''}</p>
             </div>
           `;
