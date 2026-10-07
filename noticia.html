@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Todas as Notícias — Enreda-te</title>
+  <title>Notícia — Enreda-te</title>
+
+  <!-- Biblioteca para converter Markdown em HTML -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
   <style>
     :root {
@@ -18,81 +21,70 @@
     * { box-sizing: border-box; }
     body { margin: 0; font-family: Arial, sans-serif; background: #ffffff; color: var(--d); }
 
-    /* --- CABEÇALHO DA PÁGINA --- */
-    header { background: var(--lg); padding: 40px 20px; text-align: center; border-bottom: 1px solid #e5ece8; }
-    header .wrap { max-width: 1180px; margin: auto; display: flex; justify-content: space-between; align-items: center; }
+    /* CABEÇALHO */
+    header { background: var(--lg); padding: 20px; border-bottom: 1px solid #e5ece8; }
+    header .wrap { max-width: 900px; margin: auto; display: flex; justify-content: space-between; align-items: center; }
     .logo { font-size: 24px; font-weight: bold; color: var(--g); text-decoration: none; }
     .back-btn { text-decoration: none; color: var(--g); font-weight: bold; border: 2px solid var(--g); padding: 8px 18px; border-radius: 999px; }
 
-    .page-title { text-align: center; padding: 40px 20px 20px; }
-    .page-title h1 { color: var(--g); font-size: 36px; margin: 0 0 10px; }
-    .page-title p { color: var(--m); font-size: 18px; margin: 0; }
+    /* ESTRUTURA DO ARTIGO */
+    .article-container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
+    .date { color: var(--o); font-weight: bold; font-size: 14px; margin-bottom: 8px; }
+    h1 { color: var(--g); font-size: clamp(28px, 4vw, 42px); margin: 0 0 16px; line-height: 1.2; }
+    .summary { font-size: 20px; color: var(--m); font-weight: 500; margin-bottom: 30px; line-height: 1.5; border-left: 4px solid var(--o); padding-left: 16px; }
+    
+    .cover-image { width: 100%; max-height: 450px; object-fit: cover; border-radius: 20px; margin-bottom: 30px; }
 
-    /* --- GRELHA DE TODAS AS NOTÍCIAS --- */
-    .noticias-sec { padding: 40px 20px 60px; }
-    .wrap { max-width: 1180px; margin: auto; }
-    .news-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-    .news-card { border: 1px solid #e5ece8; border-radius: 22px; overflow: hidden; background: white; box-shadow: 0 10px 30px #23483b12; display: flex; flex-direction: column; }
-    .photo { height: 180px; background: linear-gradient(135deg, #d6e8e1, #f3d9bb); display: grid; place-items: center; color: var(--g); font-weight: bold; background-size: cover; background-position: center; }
-    .news-body { padding: 20px; flex-grow: 1; }
-    .date { font-size: 12px; color: var(--o); font-weight: bold; }
-    .news-body h3 { color: var(--g); margin: 8px 0; font-size: 20px; }
-    .news-body p { color: var(--m); font-size: 15px; margin: 0; line-height: 1.5; }
-    .loading-msg { grid-column: 1 / -1; text-align: center; color: var(--m); padding: 40px; font-style: italic; }
+    /* CONTEÚDO DO MARKDOWN */
+    .content { font-size: 18px; line-height: 1.7; color: var(--d); }
+    .content p { margin-bottom: 20px; }
+    .content img { max-width: 100%; height: auto; border-radius: 12px; margin: 20px 0; }
+    .content h2, .content h3 { color: var(--g); margin-top: 32px; }
+    .content blockquote { background: var(--lg); padding: 16px 24px; border-left: 4px solid var(--g); margin: 24px 0; border-radius: 8px; }
 
-    @media(max-width: 768px) {
-      .news-grid { grid-template-columns: 1fr; }
-      header .wrap { flex-direction: column; gap: 15px; }
-    }
+    .loading-msg { text-align: center; color: var(--m); padding: 60px 20px; font-style: italic; font-size: 18px; }
   </style>
 </head>
 <body>
 
-  <!-- CABEÇALHO COM NAVEGAÇÃO -->
   <header>
     <div class="wrap">
       <a href="/" class="logo">Enreda-te</a>
-      <a href="/" class="back-btn">← Voltar à Página Inicial</a>
+      <a href="/noticias.html" class="back-btn">← Voltar às Notícias</a>
     </div>
   </header>
 
-  <div class="page-title">
-    <h1>Todas as Notícias</h1>
-    <p>Acompanhe todas as atividades, projetos e novidades da associação.</p>
-  </div>
+  <main class="article-container" id="article-content">
+    <div class="loading-msg">A carregar notícia...</div>
+  </main>
 
-  <!-- GRELHA COMPLETA -->
-  <section class="noticias-sec">
-    <div class="wrap">
-      <div class="news-grid" id="all-news-container">
-        <div class="loading-msg">A carregar todas as notícias...</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- SCRIPT PARA CARREGAR TODAS AS NOTÍCIAS DO GITHUB -->
   <script>
     const REPO_USER = 'FranciscoSousaDeveloper';
     const REPO_NAME = 'enreda-te';
     const FOLDER_PATH = 'content/noticias';
 
-    function parseFrontmatter(markdown) {
-      const result = {};
-      const match = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    // Função para separar o Frontmatter (YAML) do Conteúdo (Markdown)
+    function parseMarkdownFile(text) {
+      const result = { meta: {}, content: '' };
+      const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+
       if (match) {
-        const lines = match[1].split('\n');
-        lines.forEach(line => {
+        const yamlHeader = match[1];
+        result.content = match[2];
+
+        yamlHeader.split('\n').forEach(line => {
           const colonIdx = line.indexOf(':');
           if (colonIdx !== -1) {
             const key = line.slice(0, colonIdx).trim();
             let val = line.slice(colonIdx + 1).trim();
             if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
-            if (val === 'true') val = true;
-            if (val === 'false') val = false;
-            result[key] = val;
+            result.meta[key] = val;
           }
         });
+      } else {
+        result.content = text;
       }
+
       return result;
     }
 
@@ -101,62 +93,54 @@
       const date = new Date(dateStr);
       if (isNaN(date)) return dateStr;
       const day = String(date.getDate()).padStart(2, '0');
-      const months = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
-      const month = months[date.getMonth()];
-      const year = date.getFullYear();
-      return `${day} ${month} ${year}`;
+      const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+      return `${day} de ${months[date.getMonth()]} de ${date.getFullYear()}`;
     }
 
-    async function fetchAllNews() {
-      const container = document.getElementById('all-news-container');
+    async function loadArticle() {
+      const container = document.getElementById('article-content');
+      const params = new URLSearchParams(window.location.search);
+      const filename = params.get('file');
+
+      if (!filename) {
+        container.innerHTML = '<div class="loading-msg">Nenhuma notícia especificada.</div>';
+        return;
+      }
+
       try {
-        const response = await fetch(`https://api.github.com/repos/${REPO_USER}/${REPO_NAME}/contents/${FOLDER_PATH}`);
-        if (!response.ok) throw new Error('Erro ao aceder ao repositório.');
-        
-        const files = await response.json();
-        const mdFiles = files.filter(f => f.name.endsWith('.md'));
+        const url = `https://raw.githubusercontent.com/${REPO_USER}/${REPO_NAME}/main/${FOLDER_PATH}/${filename}`;
+        const response = await fetch(url);
 
-        if (mdFiles.length === 0) {
-          container.innerHTML = '<div class="loading-msg">Nenhuma notícia publicada até ao momento.</div>';
-          return;
-        }
+        if (!response.ok) throw new Error('Notícia não encontrada.');
 
-        const newsList = [];
+        const rawText = await response.text();
+        const { meta, content } = parseMarkdownFile(rawText);
 
-        for (const file of mdFiles) {
-          const res = await fetch(file.download_url);
-          const text = await res.text();
-          const meta = parseFrontmatter(text);
-          meta.filename = file.name;
-          newsList.push(meta);
-        }
+        // Converter o corpo em Markdown para HTML usando a biblioteca Marked
+        const htmlBody = marked.parse(content);
 
-        // Ordenar da mais recente para a mais antiga
-        newsList.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+        const photoHtml = meta.photo ? `<img src="${meta.photo}" alt="${meta.title}" class="cover-image">` : '';
+        const summaryHtml = meta.summary ? `<p class="summary">${meta.summary}</p>` : '';
 
-        container.innerHTML = '';
-        newsList.forEach(item => {
-          const photoBg = item.photo ? `style="background-image: url('${item.photo}'); color: transparent;"` : '';
-          const card = document.createElement('div');
-          card.className = 'news-card';
-          card.innerHTML = `
-            <div class="photo" ${photoBg}>${item.photo ? '' : 'FOTOGRAFIA'}</div>
-            <div class="news-body">
-              <div class="date">${formatDate(item.date)}</div>
-              <h3>${item.title || 'Sem Título'}</h3>
-              <p>${item.summary || ''}</p>
+        container.innerHTML = `
+          <article>
+            <div class="date">${formatDate(meta.date)}</div>
+            <h1>${meta.title || 'Sem Título'}</h1>
+            ${summaryHtml}
+            ${photoHtml}
+            <div class="content">
+              ${htmlBody}
             </div>
-          `;
-          container.appendChild(card);
-        });
+          </article>
+        `;
 
       } catch (err) {
         console.error(err);
-        container.innerHTML = '<div class="loading-msg">Erro ao carregar a lista de notícias.</div>';
+        container.innerHTML = '<div class="loading-msg">Erro ao carregar a notícia. Verifica se o link está correto.</div>';
       }
     }
 
-    fetchAllNews();
+    loadArticle();
   </script>
 </body>
 </html>
